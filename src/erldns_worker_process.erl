@@ -16,7 +16,6 @@
 -module(erldns_worker_process).
 
 -include_lib("dns/include/dns.hrl").
--include_lib("parse_xfrm_utils/include/parse_xfrm_utils_if_than_else.hrl").
 
 -behaviour(gen_server).
 
@@ -32,7 +31,6 @@
 -define(MAX_PACKET_SIZE, 512).
 -define(REDIRECT_TO_LOOPBACK, false).
 -define(LOOPBACK_DEST, {127, 0, 0, 10}).
--define(DEST_HOST(Host), ?IF(?REDIRECT_TO_LOOPBACK, ?LOOPBACK_DEST, Host)).
 
 -record(state, {}).
 
@@ -62,7 +60,7 @@ handle_call({process, DecodedMessage, Socket, Port, {udp, Host}}, _From, State) 
   % simulate_timeout(DecodedMessage),
 
   Response = erldns_handler:handle(DecodedMessage, {udp, Host}),
-  DestHost = ?DEST_HOST(Host),
+  DestHost = dest_host(Host),
 
   case erldns_encoder:encode_message(Response, [{'max_size', max_payload_size(Response)}]) of
     {false, EncodedMessage} ->
@@ -88,6 +86,14 @@ code_change(_OldVsn, State, _Extra) ->
 
 
 %% Internal private functions
+
+-if(?REDIRECT_TO_LOOPBACK).
+dest_host(Host) ->
+    ?LOOPBACK_DEST.
+-else.
+dest_host(Host) ->
+    Host.
+-endif.
 
 send_tcp_message(Socket, EncodedMessage) ->
   BinLength = byte_size(EncodedMessage),

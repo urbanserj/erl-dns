@@ -19,7 +19,6 @@
 
 -behavior(gen_server).
 
--include_lib("parse_xfrm_utils/include/parse_xfrm_utils_if_than_else.hrl").
 -include_lib("dns/include/dns_records.hrl").
 
 %% API
@@ -54,20 +53,21 @@ start_link() ->
 %% @doc Throttle the given message if necessary.
 -spec throttle(dns:message(), Context :: {term(), Host :: inet:ip_address() | inet:hostname()}) ->
   ok | throttle_result().
+-if(?ENABLED).
 throttle(_Message, {tcp, _Host}) ->
   ok;
 throttle(Message, {_, Host}) ->
-  ?IF(?ENABLED,
-      begin
-        case lists:filter(fun(Q) -> Q#dns_query.type =:= ?DNS_TYPE_ANY end, Message#dns_message.questions) of
-          [] -> ok;
-          _ -> record_request(maybe_throttle(Host))
-        end
-      end,
-      begin
-        %lager:debug("Throttle not enabled"),
-        ok
-      end).
+  case lists:filter(fun(Q) -> Q#dns_query.type =:= ?DNS_TYPE_ANY end, Message#dns_message.questions) of
+    [] -> ok;
+    _ -> record_request(maybe_throttle(Host))
+  end.
+-else.
+throttle(_Message, {tcp, _Host}) ->
+  ok;
+throttle(_Message, {_, _Host}) ->
+  %lager:debug("Throttle not enabled"),
+  ok.
+-endif.
 
 %% @doc Sweep the query throttle table for expired host records.
 -spec sweep() -> any().
